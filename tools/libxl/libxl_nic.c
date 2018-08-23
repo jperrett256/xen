@@ -17,6 +17,12 @@
 
 #include "libxl_internal.h"
 
+#include <stdlib.h>
+
+#include <string.h>
+
+#include "md5.h"
+
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
@@ -54,7 +60,8 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 }
 
 static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
-                                        libxl_device_nic *nic, bool hotplug)
+                                        libxl_device_nic *nic, const char * name,
+                                        bool hotplug)
 {
     int rc;
 
@@ -65,11 +72,9 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         if (!nic->model) return ERROR_NOMEM;
     }
     if (libxl__mac_is_default(&nic->mac)) {
-        const uint8_t *r;
-        libxl_uuid uuid;
+        uint8_t r[16];
 
-        libxl_uuid_generate(&uuid);
-        r = libxl_uuid_bytearray(&uuid);
+	md5_sum((const uint8_t *) name, strlen(name), r);
 
         nic->mac[0] = 0x00;
         nic->mac[1] = 0x16;
@@ -478,7 +483,7 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
          * but qemu needs the nic information to be complete.
          */
         ret = libxl__device_nic_setdefault(gc, domid, &d_config->nics[i],
-                                           false);
+                                           d_config->c_info.name, false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set nic defaults for nic %d", i);
             goto out;
