@@ -50,6 +50,9 @@
 #include <sys/un.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
+#include <ifaddrs.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
 
 #include <xenevtchn.h>
 #include <xenstore.h>
@@ -1412,6 +1415,8 @@ _hidden int libxl__pci_numdevs(libxl__gc *gc);
 _hidden int libxl__pci_topology_init(libxl__gc *gc,
                                      physdev_pci_device_t *devs,
                                      int num_devs);
+
+_hidden int libxl__get_host_mac(libxl__gc *gc, unsigned char *buf);
 
 /* from libxl_pci */
 
