@@ -21,6 +21,12 @@
 
 #include "md5.h"
 
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <sys/socket.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
+
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
@@ -57,6 +63,33 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+static int libxl__get_host_mac(unsigned char *buf)
+{
+    int success = -1;
+    struct ifaddrs *iface_list;
+    if (getifaddrs(&iface_list) == 0) {
+        for (struct ifaddrs *iface = iface_list;
+            iface != NULL; iface = iface->ifa_next) {
+            if (iface->ifa_addr && iface->ifa_addr->sa_family == AF_PACKET) {
+                struct sockaddr_ll *s = (struct sockaddr_ll *)iface->ifa_addr;
+                if (s->sll_halen == 6) {
+                    for (int i = 0; i < 6; i++) {
+                        buf[i] = s->sll_addr[i];
+                    }
+                    if(buf[0] || buf[1] || buf[2] || buf[3] || buf[4] || buf[5]) {
+                        success = 0;
+                        break;
+                    }
+                }
+            }
+        }
+        freeifaddrs(iface_list);
+    } else {
+        perror("ERROR: getifaddrs\n");
+    }
+    return success;
+}
+
 static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
                                         libxl_device_nic *nic, const char *name,
                                         bool hotplug)
@@ -72,7 +105,17 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
     if (libxl__mac_is_default(&nic->mac)) {
         uint8_t r[16];
 
-        md5_sum((const uint8_t *) name, strlen(name), r);
+        uint8_t hostmac[6] = {0};
+
+        if(libxl__get_host_mac(hostmac)) {
+            perror("WARNING: failed to get host mac address\n");
+        }
+
+        MD5_CTX ctx;
+        MD5Init(&ctx);
+        MD5Update(&ctx, hostmac, sizeof(hostmac));
+        MD5Update(&ctx, (uint8_t *) name, strlen(name));
+        MD5Final(r, &ctx);
 
         nic->mac[0] = 0x00;
         nic->mac[1] = 0x16;
