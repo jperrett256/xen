@@ -92,7 +92,7 @@ static int libxl__get_host_mac(unsigned char *buf)
 
 static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
                                         libxl_device_nic *nic, const char *name,
-                                        bool hotplug)
+                                        const int nic_index, bool hotplug)
 {
     int rc;
 
@@ -115,6 +115,7 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         MD5Init(&ctx);
         MD5Update(&ctx, hostmac, sizeof(hostmac));
         MD5Update(&ctx, (uint8_t *) name, strlen(name));
+        MD5Update(&ctx, (uint8_t *) &nic_index, sizeof(nic_index));
         MD5Final(r, &ctx);
 
         nic->mac[0] = 0x00;
@@ -525,7 +526,7 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
          * but qemu needs the nic information to be complete.
          */
         ret = libxl__device_nic_setdefault(gc, domid, &d_config->nics[i],
-                                           d_config->c_info.name, false);
+                                           d_config->c_info.name, i, false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set nic defaults for nic %d", i);
             goto out;
