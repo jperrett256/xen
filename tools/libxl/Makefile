@@ -142,7 +142,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_9pfs.o libxl_domain.o libxl_vdispl.o \
 			libxl_pvcalls.o libxl_vsnd.o libxl_vkb.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += libxl_genid.o
-LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
+LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o md5.o
 
 LIBXL_TESTS += timedereg
 LIBXL_TESTS_PROGS = $(LIBXL_TESTS) fdderegrace
