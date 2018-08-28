@@ -17,6 +17,20 @@
 
 #include "libxl_internal.h"
 
+#include <string.h>
+
+#include "md5.h"
+
+#ifdef __linux__
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <sys/socket.h>
+#include <linux/if_packet.h>
+#include <net/ethernet.h>
+#endif
+
+#include <arpa/inet.h>
+
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
@@ -53,8 +67,46 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+static int libxl__get_host_mac(libxl__gc *gc, unsigned char *buf)
+{
+    int rc = ERROR_FAIL;
+
+    #ifdef __linux__
+    struct ifaddrs *iface_list;
+    uint32_t largest = 0;
+
+    if (getifaddrs(&iface_list) == 0) {
+        for (struct ifaddrs *iface = iface_list;
+            iface != NULL; iface = iface->ifa_next) {
+            if (iface->ifa_addr && iface->ifa_addr->sa_family == AF_PACKET) {
+                struct sockaddr_ll *s = (struct sockaddr_ll *)iface->ifa_addr;
+                if (s->sll_halen == 6) {
+                    uint32_t value = 0;
+
+                    /*take largest available prefix*/
+                    memcpy(&value, s->sll_addr, sizeof(value));
+                    value = ntohl(value);
+                    if (value > largest) {
+                        if (s->sll_addr[0] | s->sll_addr[1] | s->sll_addr[2]
+                        memcpy(buf, s->sll_addr, sizeof(value));
+                        largest = value;
+                        rc = 0;
+                    }
+                }
+            }
+        }
+        freeifaddrs(iface_list);
+    } else {
+        LOGE(WARN, "getifaddrs failed");
+    }
+    #endif
+
+    return rc;
+}
+
 static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
-                                        libxl_device_nic *nic, bool hotplug)
+                                        libxl_device_nic *nic, const char *name,
+                                        const int nic_index, bool hotplug)
 {
     int rc;
 
@@ -65,11 +117,23 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         if (!nic->model) return ERROR_NOMEM;
     }
     if (libxl__mac_is_default(&nic->mac)) {
-        const uint8_t *r;
-        libxl_uuid uuid;
+        uint8_t r[16];
 
-        libxl_uuid_generate(&uuid);
-        r = libxl_uuid_bytearray(&uuid);
+        MD5_CTX ctx;
+        MD5Init(&ctx);
+
+        uint8_t seed[4];
+
+        if (libxl__get_host_mac(gc, seed) == 0) {
+            MD5Update(&ctx, seed, sizeof(seed));
+        } else {
+            LOGD(INFO, domid, "seed: failed to get host mac address, will generate vm mac address without");
+        }
+
+        MD5Update(&ctx, (uint8_t *) name, strlen(name));
+        uint32_t index = htonl(nic_index);
+        MD5Update(&ctx, (uint8_t *) &index, sizeof(nic_index));
+        MD5Final(r, &ctx);
 
         nic->mac[0] = 0x00;
         nic->mac[1] = 0x16;
@@ -478,7 +542,7 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
          * but qemu needs the nic information to be complete.
          */
         ret = libxl__device_nic_setdefault(gc, domid, &d_config->nics[i],
-                                           false);
+                                           d_config->c_info.name, i, false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set nic defaults for nic %d", i);
             goto out;
