@@ -1413,6 +1413,8 @@ _hidden int libxl__pci_topology_init(libxl__gc *gc,
                                      physdev_pci_device_t *devs,
                                      int num_devs);
 
+int libxl__get_host_mac(libxl__gc *gc, unsigned char *buf);
+
 /* from libxl_pci */
 
 _hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);
