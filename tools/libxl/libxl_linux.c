@@ -16,7 +16,7 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
- 
+
 int libxl__try_phy_backend(mode_t st_mode)
 {
     if (S_ISBLK(st_mode) || S_ISREG(st_mode)) {
@@ -305,6 +305,35 @@ int libxl__pci_topology_init(libxl__gc *gc,
     closedir(dir);
 
     return err;
+}
+
+int libxl__get_host_mac(libxl__gc *gc, unsigned char *buf)
+{
+    int rc = ERROR_FAIL;
+
+    struct ifaddrs *iface_list;
+    uint8_t largest[6] = {0};
+
+    if (getifaddrs(&iface_list) == 0) {
+        for (struct ifaddrs *iface = iface_list;
+            iface != NULL; iface = iface->ifa_next) {
+            if (iface->ifa_addr && iface->ifa_addr->sa_family == AF_PACKET) {
+                struct sockaddr_ll *s = (struct sockaddr_ll *)iface->ifa_addr;
+                if (s->sll_halen == 6) {
+                    if (memcmp(s->sll_addr, largest, s->sll_halen) > 0) {
+                        memcpy(buf, s->sll_addr, s->sll_halen);
+                        memcpy(largest, s->sll_addr, s->sll_halen);
+                        rc = 0;
+                    }
+                }
+            }
+        }
+        freeifaddrs(iface_list);
+    } else {
+        LOGE(WARN, "getifaddrs failed");
+    }
+
+    return rc;
 }
 
 /*

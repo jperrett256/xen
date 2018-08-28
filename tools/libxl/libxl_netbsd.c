@@ -124,3 +124,8 @@ int libxl__pci_topology_init(libxl__gc *gc,
 {
     return ERROR_NI;
 }
+
+int libxl__get_host_mac(libxl__gc *gc, unsigned char *buf)
+{
+    return ERROR_NI;
+}
