@@ -20,19 +20,7 @@
 #include <stdint.h>
 #include "md5.h"
 
-struct MD5Context {
-        uint32_t buf[4];
-        uint32_t bits[2];
-        uint8_t in[64];
-};
-
-static void MD5Init(struct MD5Context *context);
-static void MD5Update(struct MD5Context *context, unsigned char const *buf,
-                          unsigned len);
-static void MD5Final(unsigned char digest[16], struct MD5Context *context);
 static void MD5Transform(uint32_t buf[4], uint32_t const in[16]);
-
-typedef struct MD5Context MD5_CTX;
 
 
 /**

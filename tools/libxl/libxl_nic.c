@@ -17,7 +17,6 @@
 
 #include "libxl_internal.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "md5.h"
@@ -106,18 +105,17 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
     if (libxl__mac_is_default(&nic->mac)) {
         uint8_t r[16];
 
-        char hostmac[7];
-        hostmac[6] = '\0';
-        if(libxl__get_host_mac((unsigned char *) hostmac)) {
+        uint8_t hostmac[6] = {0}; 
+
+        if(libxl__get_host_mac(hostmac)) {
             perror("WARNING: failed to get host mac address\n");
-            hostmac[0] = '\0';
         }
 
-        char data[strlen(hostmac) + strlen(name) + 1];
-        strcpy(data, hostmac);
-        strcat(data, name);
-
-        md5_sum((uint8_t *) data, strlen(data), r);
+        MD5_CTX ctx;
+        MD5Init(&ctx);
+        MD5Update(&ctx, hostmac, sizeof(hostmac));
+        MD5Update(&ctx, (uint8_t *) name, strlen(name));
+        MD5Final(r, &ctx);
 
         nic->mac[0] = 0x00;
         nic->mac[1] = 0x16;
@@ -125,6 +123,7 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
         nic->mac[3] = r[0] & 0x7f;
         nic->mac[4] = r[1];
         nic->mac[5] = r[2];
+
     }
     if (!nic->bridge) {
         nic->bridge = strdup("xenbr0");
