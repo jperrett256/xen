@@ -25,6 +25,7 @@ XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 XEN_LIBVCHAN       = $(XEN_ROOT)/tools/libvchan
+XEN_SHARED         = $(XEN_ROOT)/tools/shared
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
